@@ -27,10 +27,18 @@ async function run() {
     await client.connect();
 
     const instructorCollection = client.db("summerCamp").collection("instructor");
+    const classCollection = client.db("summerCamp").collection("class");
 
     app.get('/instructor', async(req, res) =>{
       const result = await instructorCollection.find().toArray();
       res.send(result)
+    })
+
+    app.post('/class', async(req, res) =>{
+      const clas = req.body;
+      console.log(clas);
+      const result = await classCollection.insertOne(clas);
+      res.send(result);
     })
 
 
@@ -53,7 +61,7 @@ run().catch(console.dir);
 
 
 app.get('/', (req, res) => {
-  res.send('boss is sitting')
+  res.send('Summer camp is start')
 })
 
 app.listen(port, () => {
