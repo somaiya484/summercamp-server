@@ -28,6 +28,24 @@ async function run() {
 
     const instructorCollection = client.db("summerCamp").collection("instructor");
     const classCollection = client.db("summerCamp").collection("class");
+    const allUsersCollection = client.db("summerCamp").collection("users");
+
+    app.get('/users', async (req, res) => {
+      const result = await allUsersCollection.find().toArray();
+      res.send(result)
+    })
+
+    app.post('/users', async (req, res) => {
+      const user = req.body;
+      console.log(user);
+      const query = { email: user.email }
+      const existingUser = await allUsersCollection.findOne(query);
+      if (existingUser) {
+        return res.send({ message: 'user is already LoggedIn' })
+      }
+      const result = await allUsersCollection.insertOne(user);
+      res.send(result)
+    })
 
     app.get('/instructor', async (req, res) => {
       const result = await instructorCollection.find().toArray();
@@ -53,9 +71,9 @@ async function run() {
       res.send(result);
     })
 
-    app.delete('/class/:id', async( req, res) => {
+    app.delete('/class/:id', async (req, res) => {
       const id = req.params.id;
-      const query = {_id: new ObjectId(id)}
+      const query = { _id: new ObjectId(id) }
       const result = await classCollection.deleteOne(query);
       res.send(result)
     })
