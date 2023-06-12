@@ -3,6 +3,7 @@ const app = express();
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 require('dotenv').config()
+const stripe = require('stripe')(process.env.PAYMENT_SECRET_KEY)
 const port = process.env.PORT || 5000;
 
 // middleware
@@ -44,6 +45,7 @@ async function run() {
     const instructorCollection = client.db("summerCamp").collection("instructor");
     const classCollection = client.db("summerCamp").collection("class");
     const allUsersCollection = client.db("summerCamp").collection("users");
+    const paymentCollection = client.db("bistroDb").collection("payments");
 
     app.post('/jwt', (req, res) => {
       const user = req.body;
@@ -57,6 +59,15 @@ async function run() {
       const query = { email: email }
       const user = await allUsersCollection.findOne(query);
       if (user?.role !== 'admin') {
+        return res.status(403).send({ error: true, message: 'access forbidden' })
+      }
+      next();
+    }
+    const verifyInstructor = async (req, res, next) => {
+      const email = req.decoded.email;
+      const query = { email: email }
+      const user = await allUsersCollection.findOne(query);
+      if (user?.role !== 'instructor') {
         return res.status(403).send({ error: true, message: 'access forbidden' })
       }
       next();
@@ -109,26 +120,17 @@ async function run() {
       res.send(result)
     })
     // roll instructor
-    app.patch('/users/instructors/:id', async(req, res) =>{
+    app.patch('/users/instructors/:id', async (req, res) => {
       const id = req.params.id;
-      const filter = {_id : new ObjectId(id)};
+      const filter = { _id: new ObjectId(id) };
       const updateDoc = {
         $set: {
           role: 'Instructor'
         }
       };
-
       const result = await allUsersCollection.updateOne(filter, updateDoc);
       res.send(result)
     })
-
-
-
-
-
-
-
-
 
     // class collection APIS
     app.get('/class', verifyJWT, async (req, res) => {
@@ -140,18 +142,54 @@ async function run() {
 
       const decodedEmail = req.decoded.email;
       if (email !== jwt.decodedEmail) {
-        return res.status(403).send({ error: true, message: 'access forbidden' })
+        return res.status(401).send({ error: true, message: 'access forbidden' })
       }
 
       const query = { email: email };
       const result = await classCollection.find(query).toArray();
       res.send(result)
-    })
+    });
 
     app.post('/class', async (req, res) => {
       const clas = req.body;
       console.log(clas);
       const result = await classCollection.insertOne(clas);
+      res.send(result);
+    })
+    // app.post("/create-payment-intent", async (req, res) => {
+    // const { items } = req.body     
+    app.post('/create-payment-intent', verifyJWT, async (req, res) => {
+      const { price } = req.body;
+
+
+      const amount = parseInt(price * 100);
+      console.log(price, amount);
+
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: 'usd',
+        payment_method_types: ['card']
+      });
+
+      res.send({
+        clientSecret: paymentIntent.client_secret
+      })
+    })
+
+
+    app.post('/payments', verifyJWT, async (req, res) => {
+      const payment = req.body;
+      const result = await paymentCollection.insertOne(payment);
+      res.send(result)
+    })
+
+
+
+
+    app.post('/class', async (req, res) => {
+      const newClass = req.body;
+      const result = await classCollection.insertOne(newClass);
       res.send(result);
     })
 
